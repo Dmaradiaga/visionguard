@@ -1,5 +1,6 @@
 from flask import (
     Blueprint,
+    current_app,
     request,
     jsonify,
     render_template,
@@ -8,14 +9,28 @@ from flask import (
 
 import cv2
 import io
+from werkzeug.exceptions import RequestEntityTooLarge
+
+from visionguard.app.core.limiter import RateLimiter
+from visionguard.app.services.service_vision import PhotoService
 
 routes = Blueprint("routes", __name__)
 
-rate_limiter = None
-photo_service = None
+rate_limiter: RateLimiter | None = None
+photo_service: PhotoService | None = None
 
 
-def configure(rate_limiter_obj, photo_service_obj):
+@routes.app_errorhandler(RequestEntityTooLarge)
+def handle_large_upload(_error):
+    return jsonify({
+        "error": "La imagen supera el límite permitido."
+    }), 413
+
+
+def configure(
+    rate_limiter_obj: RateLimiter,
+    photo_service_obj: PhotoService,
+) -> None:
     global rate_limiter
     global photo_service
 
@@ -35,7 +50,13 @@ def blur():
     la imagen resultante.
     """
 
-    client_ip = request.remote_addr
+    if rate_limiter is None or photo_service is None:
+        current_app.logger.error("Application services have not been configured")
+        return jsonify({
+            "error": "Servicio no disponible."
+        }), 500
+
+    client_ip = request.remote_addr or "unknown"
 
     if not rate_limiter.is_allowed(client_ip):
         return jsonify({
@@ -80,11 +101,8 @@ def blur():
         }), 400
 
     except Exception:
+        current_app.logger.exception("Failed to process uploaded image")
         return jsonify({
             "error": "Error interno."
         }), 500
-
-
-
-
 

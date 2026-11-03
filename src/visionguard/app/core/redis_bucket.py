@@ -1,7 +1,7 @@
 import time
 import redis
 
-from app.core.limiter import RateLimiter
+from visionguard.app.core.limiter import RateLimiter
 
 
 class RedisTokenBucket(RateLimiter):

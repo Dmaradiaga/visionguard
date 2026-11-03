@@ -318,8 +318,8 @@ processBtn.addEventListener("click", async () => {
 
         if (facesFound) {
 
-            stats.innerHTML =
-                `👤 Caras detectadas: <strong>${facesFound}</strong>`;
+            stats.textContent =
+                `👤 Caras detectadas: ${facesFound}`;
         }
 
         downloadBtn.style.display =

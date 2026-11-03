@@ -1,11 +1,4 @@
-from app.main import run
+def main() -> None:
+    from visionguard.app.main import main as app_main
 
-
-if __name__ == "__main__":
-    app = run()
-
-    app.run(
-        host="0.0.0.0",
-        port=8080,
-        debug=True
-    )
+    app_main()
