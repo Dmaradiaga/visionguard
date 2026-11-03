@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Face Blur Service</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0,0,0,.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        p {
+            text-align: center;
+            color: #666;
+        }
+
+        .upload-area {
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 22px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+            font-size: 15px;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button:disabled {
+            background: gray;
+            cursor: not-allowed;
+        }
+
+        .download-btn {
+            display: none;
+            margin-top: 15px;
+            background: #059669;
+        }
+
+        .download-btn:hover {
+            background: #047857;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .images {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,.08);
+        }
+
+        .panel h3 {
+            text-align: center;
+        }
+
+        img {
+            width: 100%;
+            border-radius: 8px;
+        }
+
+        .stats {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+
+        <h1>🕶️ Face Blur Service</h1>
+
+        <p>
+            Sube una fotografía y anonimizaremos todos los rostros detectados.
+        </p>
+
+        <div class="upload-area">
+            <input
+                type="file"
+                id="imageInput"
+                accept="image/*"
+            >
+
+            <br>
+
+            <button id="processBtn">
+                Procesar Imagen
+            </button>
+
+            <br>
+
+            <button
+                id="downloadBtn"
+                class="download-btn"
+            >
+                Descargar Resultado
+            </button>
+        </div>
+
+        <div
+            id="loading"
+            class="loading"
+        >
+            Procesando imagen...
+        </div>
+
+        <div
+            id="status"
+            class="status"
+        ></div>
+
+        <div
+            class="stats"
+            id="stats"
+        ></div>
+
+        <div class="images">
+
+            <div class="panel">
+                <h3>Imagen Original</h3>
+                <img
+                    id="originalImage"
+                    style="display:none;"
+                >
+            </div>
+
+            <div class="panel">
+                <h3>Imagen Procesada</h3>
+                <img
+                    id="processedImage"
+                    style="display:none;"
+                >
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+const imageInput = document.getElementById("imageInput");
+const processBtn = document.getElementById("processBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+
+const originalImage = document.getElementById("originalImage");
+const processedImage = document.getElementById("processedImage");
+
+const statusBox = document.getElementById("status");
+const loading = document.getElementById("loading");
+const stats = document.getElementById("stats");
+
+let processedBlob = null;
+
+imageInput.addEventListener("change", () => {
+
+    const file = imageInput.files[0];
+
+    if (!file) {
+        return;
+    }
+
+    originalImage.src = URL.createObjectURL(file);
+    originalImage.style.display = "block";
+
+    processedImage.style.display = "none";
+
+    downloadBtn.style.display = "none";
+
+    stats.textContent = "";
+});
+
+processBtn.addEventListener("click", async () => {
+
+    const file = imageInput.files[0];
+
+    if (!file) {
+
+        showError(
+            "Seleccione una imagen."
+        );
+
+        return;
+    }
+
+    loading.style.display = "block";
+
+    statusBox.style.display = "none";
+
+    processBtn.disabled = true;
+
+    try {
+
+        const formData = new FormData();
+
+        formData.append(
+            "image",
+            file
+        );
+
+        const response = await fetch(
+            "/api/blur",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        if (!response.ok) {
+
+            let errorMessage =
+                "Error inesperado.";
+
+            try {
+
+                const errorData =
+                    await response.json();
+
+                errorMessage =
+                    errorData.error ||
+                    errorMessage;
+
+            } catch {}
+
+            throw new Error(
+                errorMessage
+            );
+        }
+
+        processedBlob =
+            await response.blob();
+
+        const imageUrl =
+            URL.createObjectURL(
+                processedBlob
+            );
+
+        processedImage.src =
+            imageUrl;
+
+        processedImage.style.display =
+            "block";
+
+        const facesFound =
+            response.headers.get(
+                "X-Faces-Found"
+            );
+
+        if (facesFound) {
+
+            stats.innerHTML =
+                `👤 Caras detectadas: <strong>${facesFound}</strong>`;
+        }
+
+        downloadBtn.style.display =
+            "inline-block";
+
+        showSuccess(
+            "Imagen procesada correctamente."
+        );
+
+    } catch (error) {
+
+        showError(error.message);
+
+    } finally {
+
+        loading.style.display = "none";
+        processBtn.disabled = false;
+    }
+});
+
+downloadBtn.addEventListener(
+    "click",
+    () => {
+
+        if (!processedBlob) {
+            return;
+        }
+
+        const link =
+            document.createElement("a");
+
+        link.href =
+            URL.createObjectURL(
+                processedBlob
+            );
+
+        link.download =
+            "blurred-image.jpg";
+
+        document.body.appendChild(
+            link
+        );
+
+        link.click();
+
+        document.body.removeChild(
+            link
+        );
+    }
+);
+
+function showSuccess(message) {
+
+    statusBox.className =
+        "status success";
+
+    statusBox.textContent =
+        message;
+
+    statusBox.style.display =
+        "block";
+}
+
+function showError(message) {
+
+    statusBox.className =
+        "status error";
+
+    statusBox.textContent =
+        message;
+
+    statusBox.style.display =
+        "block";
+}
+</script>
+
+</body>
+</html>
