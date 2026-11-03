@@ -1,36 +1,15 @@
-import logging
 import os
 
 from flask import Flask
 import redis
 
-from visionguard.app.core.limiter import RateLimiter
 from visionguard.app.core.token_bucket import TokenBucket
-from visionguard.app.core.redis_bucket import RedisTokenBucket
-from visionguard.app.routes.routes import routes, configure
+from visionguard.app.core.redis_bucket import (
+    RedisFallbackRateLimiter,
+    RedisTokenBucket,
+)
+from visionguard.app.routes.routes import create_routes
 from visionguard.app.services.service_vision import PhotoService
-
-
-class RedisFallbackRateLimiter(RateLimiter):
-    def __init__(
-        self,
-        redis_limiter: RateLimiter,
-        fallback_limiter: RateLimiter,
-        logger: logging.Logger,
-    ):
-        self.redis_limiter = redis_limiter
-        self.fallback_limiter = fallback_limiter
-        self.logger = logger
-
-    def is_allowed(self, user_id: str) -> bool:
-        try:
-            return self.redis_limiter.is_allowed(user_id)
-        except redis.RedisError as exc:
-            self.logger.warning(
-                "Redis rate limiter unavailable; using in-memory fallback: %s",
-                exc,
-            )
-            return self.fallback_limiter.is_allowed(user_id)
 
 
 def run() -> Flask:
@@ -73,15 +52,9 @@ def run() -> Flask:
             refill_rate=1 / 60
         )
 
-    photo_service = PhotoService()
-
-    # Inyección de dependencias.
-    configure(
-        rate_limiter,
-        photo_service
+    app.register_blueprint(
+        create_routes(rate_limiter, PhotoService())
     )
-
-    app.register_blueprint(routes)
 
     return app
 

@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import redis
 
-from visionguard.app.main import RedisFallbackRateLimiter
+from visionguard.app.core.redis_bucket import RedisFallbackRateLimiter
 
 
 class BrokenRedisLimiter:

@@ -1,7 +1,31 @@
+import logging
 import time
+
 import redis
 
 from visionguard.app.core.limiter import RateLimiter
+
+
+class RedisFallbackRateLimiter(RateLimiter):
+    def __init__(
+        self,
+        redis_limiter: RateLimiter,
+        fallback_limiter: RateLimiter,
+        logger: logging.Logger,
+    ):
+        self.redis_limiter = redis_limiter
+        self.fallback_limiter = fallback_limiter
+        self.logger = logger
+
+    def is_allowed(self, user_id: str) -> bool:
+        try:
+            return self.redis_limiter.is_allowed(user_id)
+        except redis.RedisError as exc:
+            self.logger.warning(
+                "Redis rate limiter unavailable; using in-memory fallback: %s",
+                exc,
+            )
+            return self.fallback_limiter.is_allowed(user_id)
 
 
 class RedisTokenBucket(RateLimiter):
